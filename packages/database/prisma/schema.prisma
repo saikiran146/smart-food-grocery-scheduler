@@ -1,0 +1,530 @@
+// Smart Food & Grocery Scheduler - Prisma Schema
+// Version: 1.0.0
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum MealStatus {
+  PLANNED
+  COMPLETED
+  SKIPPED
+  CHANGED
+}
+
+enum GroceryCategory {
+  VEGETABLES
+  FRUITS
+  RICE
+  PULSES
+  DAIRY
+  MEAT
+  SPICES
+  OILS
+  SNACKS
+  BEVERAGES
+  OTHER
+}
+
+enum StorageLocation {
+  REFRIGERATOR
+  FREEZER
+  PANTRY
+}
+
+enum Unit {
+  KG
+  G
+  LITER
+  ML
+  PIECES
+  DOZEN
+  BUNCH
+  PACKET
+  CAN
+  BOTTLE
+}
+
+enum WasteCategory {
+  EXPIRED
+  SPOILED
+  OVERCOOKED
+  LEFTOVERS_DISCARDED
+  OTHER
+}
+
+enum RipnessLevel {
+  UNRIPE
+  SLIGHTLY_RIPE
+  RIPE
+  OVERRIPE
+}
+
+enum NotificationType {
+  LOW_STOCK
+  EXPIRING_SOON
+  EXPIRED
+  MEAL_REMINDER
+  SHOPPING_REMINDER
+  FRUIT_ALERT
+  AI_SUGGESTION
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  READ
+  DISMISSED
+}
+
+enum TransactionType {
+  PURCHASE
+  CONSUMPTION
+  WASTE
+  ADJUSTMENT
+}
+
+enum DietaryPreference {
+  VEGETARIAN
+  NON_VEGETARIAN
+  VEGAN
+  JAIN
+  EGGETARIAN
+}
+
+enum RecipeCuisine {
+  NORTH_INDIAN
+  SOUTH_INDIAN
+  BENGALI
+  GUJARATI
+  RAJASTHANI
+  PUNJABI
+  MAHARASHTRIAN
+  KERALA
+  CHINESE
+  CONTINENTAL
+  OTHER
+}
+
+// ============================================================
+// USERS & FAMILIES
+// ============================================================
+
+model User {
+  id                String            @id @default(cuid())
+  email             String            @unique
+  name              String
+  avatar            String?
+  passwordHash      String?
+  googleId          String?           @unique
+  dietaryPreference DietaryPreference @default(VEGETARIAN)
+  isEmailVerified   Boolean           @default(false)
+  isActive          Boolean           @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relations
+  family            FamilyMember[]
+  createdFamilies   Family[]          @relation("FamilyOwner")
+  mealSchedules     MealSchedule[]
+  notifications     Notification[]
+  wasteLog          WasteLog[]
+  shoppingLists     ShoppingList[]
+  refreshTokens     RefreshToken[]
+
+  @@index([email])
+  @@index([googleId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+model Family {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  ownerId     String
+  inviteCode  String   @unique @default(cuid())
+  timezone    String   @default("Asia/Kolkata")
+  currency    String   @default("INR")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner         User           @relation("FamilyOwner", fields: [ownerId], references: [id])
+  members       FamilyMember[]
+  groceries     GroceryItem[]
+  mealSchedules MealSchedule[]
+  wasteLogs     WasteLog[]
+  shoppingLists ShoppingList[]
+  fruits        Fruit[]
+  budgets       Budget[]
+
+  @@index([ownerId])
+  @@index([inviteCode])
+  @@map("families")
+}
+
+model FamilyMember {
+  id        String   @id @default(cuid())
+  familyId  String
+  userId    String
+  role      String   @default("MEMBER") // OWNER, ADMIN, MEMBER
+  nickname  String?
+  birthDate DateTime?
+  createdAt DateTime @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, userId])
+  @@index([familyId])
+  @@index([userId])
+  @@map("family_members")
+}
+
+// ============================================================
+// RECIPES & INGREDIENTS
+// ============================================================
+
+model Recipe {
+  id               String        @id @default(cuid())
+  name             String
+  description      String?
+  cuisine          RecipeCuisine @default(NORTH_INDIAN)
+  isVegetarian     Boolean       @default(true)
+  servings         Int           @default(4)
+  prepTimeMinutes  Int           @default(15)
+  cookTimeMinutes  Int           @default(30)
+  difficulty       String        @default("MEDIUM") // EASY, MEDIUM, HARD
+  imageUrl         String?
+  instructions     Json          // Array of step strings
+  tags             String[]
+  estimatedCost    Float         @default(0)
+  calories         Float?
+  protein          Float?
+  carbs            Float?
+  fat              Float?
+  fiber            Float?
+  isPublic         Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  ingredients   RecipeIngredient[]
+  mealSchedules MealSchedule[]
+
+  @@index([name])
+  @@index([isVegetarian])
+  @@index([cuisine])
+  @@map("recipes")
+}
+
+model Ingredient {
+  id           String          @id @default(cuid())
+  name         String          @unique
+  category     GroceryCategory @default(OTHER)
+  defaultUnit  Unit            @default(G)
+  caloriesPer  Float?          // per 100g/ml
+  proteinPer   Float?
+  carbsPer     Float?
+  fatPer       Float?
+  createdAt    DateTime        @default(now())
+
+  recipeIngredients RecipeIngredient[]
+  groceryItems      GroceryItem[]
+
+  @@index([name])
+  @@index([category])
+  @@map("ingredients")
+}
+
+model RecipeIngredient {
+  id           String @id @default(cuid())
+  recipeId     String
+  ingredientId String
+  quantity     Float
+  unit         Unit
+  isOptional   Boolean @default(false)
+  notes        String?
+
+  recipe     Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id])
+
+  @@unique([recipeId, ingredientId])
+  @@index([recipeId])
+  @@index([ingredientId])
+  @@map("recipe_ingredients")
+}
+
+// ============================================================
+// MEAL PLANNING
+// ============================================================
+
+model MealSchedule {
+  id           String     @id @default(cuid())
+  familyId     String
+  userId       String
+  recipeId     String?
+  mealType     MealType
+  status       MealStatus @default(PLANNED)
+  scheduledAt  DateTime
+  servings     Int        @default(4)
+  customMealName String?
+  notes        String?
+  estimatedCost Float?
+  actualCost   Float?
+  completedAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  family Family  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User    @relation(fields: [userId], references: [id])
+  recipe Recipe? @relation(fields: [recipeId], references: [id])
+
+  @@index([familyId, scheduledAt])
+  @@index([userId])
+  @@index([status])
+  @@map("meal_schedules")
+}
+
+// ============================================================
+// GROCERY INVENTORY
+// ============================================================
+
+model GroceryItem {
+  id              String          @id @default(cuid())
+  familyId        String
+  ingredientId    String?
+  name            String
+  category        GroceryCategory
+  quantity        Float
+  unit            Unit
+  purchaseDate    DateTime        @default(now())
+  expiryDate      DateTime?
+  costPerUnit     Float           @default(0)
+  totalCost       Float           @default(0)
+  storageLocation StorageLocation @default(PANTRY)
+  brand           String?
+  notes           String?
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  family       Family             @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  ingredient   Ingredient?        @relation(fields: [ingredientId], references: [id])
+  transactions GroceryTransaction[]
+
+  @@index([familyId])
+  @@index([category])
+  @@index([expiryDate])
+  @@index([isActive])
+  @@map("grocery_items")
+}
+
+model GroceryTransaction {
+  id            String          @id @default(cuid())
+  groceryItemId String
+  type          TransactionType
+  quantity      Float
+  unit          Unit
+  notes         String?
+  mealScheduleId String?
+  performedAt   DateTime        @default(now())
+  createdAt     DateTime        @default(now())
+
+  groceryItem GroceryItem @relation(fields: [groceryItemId], references: [id], onDelete: Cascade)
+
+  @@index([groceryItemId])
+  @@index([type])
+  @@index([performedAt])
+  @@map("grocery_transactions")
+}
+
+// ============================================================
+// SHOPPING LISTS
+// ============================================================
+
+model ShoppingList {
+  id          String   @id @default(cuid())
+  familyId    String
+  userId      String
+  name        String
+  description String?
+  totalBudget Float?
+  totalCost   Float    @default(0)
+  isCompleted Boolean  @default(false)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  family Family         @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User           @relation(fields: [userId], references: [id])
+  items  ShoppingItem[]
+
+  @@index([familyId])
+  @@index([userId])
+  @@map("shopping_lists")
+}
+
+model ShoppingItem {
+  id             String  @id @default(cuid())
+  shoppingListId String
+  name           String
+  category       GroceryCategory
+  quantity       Float
+  unit           Unit
+  estimatedCost  Float   @default(0)
+  actualCost     Float?
+  isPurchased    Boolean @default(false)
+  notes          String?
+  groceryItemId  String?
+
+  shoppingList ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+
+  @@index([shoppingListId])
+  @@map("shopping_items")
+}
+
+// ============================================================
+// WASTE TRACKING
+// ============================================================
+
+model WasteLog {
+  id            String        @id @default(cuid())
+  familyId      String
+  userId        String
+  itemName      String
+  category      GroceryCategory
+  wasteCategory WasteCategory
+  quantity      Float
+  unit          Unit
+  costWasted    Float         @default(0)
+  reason        String?
+  wastedAt      DateTime      @default(now())
+  createdAt     DateTime      @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([familyId])
+  @@index([userId])
+  @@index([wastedAt])
+  @@index([wasteCategory])
+  @@map("waste_logs")
+}
+
+// ============================================================
+// FRUIT TRACKING
+// ============================================================
+
+model Fruit {
+  id              String       @id @default(cuid())
+  familyId        String
+  name            String
+  quantity        Int
+  remainingQty    Int
+  purchaseDate    DateTime     @default(now())
+  ripnessLevel    RipnessLevel @default(UNRIPE)
+  expectedRipeDays Int         @default(3)
+  expiryDate      DateTime?
+  costPerPiece    Float        @default(0)
+  notes           String?
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  family     Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  alerts     FruitAlert[]
+
+  @@index([familyId])
+  @@index([expiryDate])
+  @@map("fruits")
+}
+
+model FruitAlert {
+  id          String   @id @default(cuid())
+  fruitId     String
+  alertType   String   // EAT_SOON, EXPIRING_TODAY, LIKELY_TO_SPOIL
+  message     String
+  sentAt      DateTime @default(now())
+  isRead      Boolean  @default(false)
+
+  fruit Fruit @relation(fields: [fruitId], references: [id], onDelete: Cascade)
+
+  @@index([fruitId])
+  @@map("fruit_alerts")
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id        String             @id @default(cuid())
+  userId    String
+  type      NotificationType
+  status    NotificationStatus @default(PENDING)
+  title     String
+  message   String
+  data      Json?
+  sentAt    DateTime?
+  readAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+  @@map("notifications")
+}
+
+// ============================================================
+// BUDGET
+// ============================================================
+
+model Budget {
+  id          String   @id @default(cuid())
+  familyId    String
+  month       Int      // 1-12
+  year        Int
+  totalBudget Float
+  spentAmount Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, month, year])
+  @@index([familyId])
+  @@map("budgets")
+}

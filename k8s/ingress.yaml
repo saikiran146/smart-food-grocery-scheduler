@@ -1,0 +1,55 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: food-scheduler-ingress
+  namespace: food-scheduler
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://your-domain.com"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - your-domain.com
+        - api.your-domain.com
+      secretName: food-scheduler-tls
+  rules:
+    - host: your-domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: food-scheduler-web
+                port:
+                  number: 3000
+    - host: api.your-domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: food-scheduler-api
+                port:
+                  number: 3001
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: food-scheduler-secrets
+  namespace: food-scheduler
+type: Opaque
+stringData:
+  postgres-password: "CHANGE_ME_POSTGRES_PASSWORD"
+  database-url: "postgresql://postgres:CHANGE_ME_POSTGRES_PASSWORD@postgres:5432/food_scheduler"
+  jwt-secret: "CHANGE_ME_JWT_SECRET_MIN_32_CHARS"
+  jwt-refresh-secret: "CHANGE_ME_JWT_REFRESH_SECRET_MIN_32_CHARS"
+  anthropic-api-key: "CHANGE_ME_ANTHROPIC_API_KEY"
+  google-client-id: "CHANGE_ME_GOOGLE_CLIENT_ID"
+  google-client-secret: "CHANGE_ME_GOOGLE_CLIENT_SECRET"
+  nextauth-secret: "CHANGE_ME_NEXTAUTH_SECRET"

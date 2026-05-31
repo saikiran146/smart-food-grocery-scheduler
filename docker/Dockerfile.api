@@ -1,0 +1,43 @@
+# Build stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copy package files
+COPY package.json ./
+COPY apps/api/package.json ./apps/api/
+COPY packages/database/package.json ./packages/database/
+COPY packages/shared/package.json ./packages/shared/
+
+# Install dependencies
+RUN npm install --workspaces --include-workspace-root
+
+# Copy source files
+COPY apps/api ./apps/api
+COPY packages ./packages
+
+# Generate Prisma client
+WORKDIR /app/packages/database
+RUN npx prisma generate
+
+# Build the API
+WORKDIR /app/apps/api
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Copy built output
+COPY --from=builder /app/apps/api/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/package.json ./
+COPY --from=builder /app/packages/database/prisma ./prisma
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
+USER nestjs
+
+EXPOSE 3001
+CMD ["node", "dist/main"]
