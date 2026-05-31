@@ -3,208 +3,246 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
-  Package,
-  TrendingDown,
-  AlertTriangle,
-  DollarSign,
-  Plus,
-  Calendar,
-  ShoppingCart,
-  Trash2,
-  Sparkles,
-  Bell,
-  ChevronRight,
-  Utensils,
+  Package, TrendingDown, AlertTriangle, IndianRupee, Plus,
+  Calendar, ShoppingCart, Trash2, Sparkles, Bell, ChevronRight,
+  Utensils, TrendingUp, ArrowUpRight,
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { useFamily } from '@/hooks/useFamily';
-import {
-  analyticsApi,
-  aiApi,
-  fruitsApi,
-  mealsApi,
-} from '@/lib/api/endpoints';
+import { analyticsApi, aiApi, fruitsApi, mealsApi } from '@/lib/api/endpoints';
 import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import { format } from 'date-fns';
 
-// ─── Skeleton helpers ───────────────────────────────────────────────────────
+// ── Skeletons ──────────────────────────────────────────────────────────────────
 
-function SkeletonCard() {
+function SkeletonStatCard() {
   return (
     <div className="bg-white rounded-xl p-5 border border-gray-100 animate-pulse">
-      <div className="h-4 bg-gray-200 rounded w-1/2 mb-3" />
-      <div className="h-8 bg-gray-200 rounded w-1/3 mb-2" />
-      <div className="h-3 bg-gray-200 rounded w-2/3" />
+      <div className="flex items-start justify-between">
+        <div className="flex-1 space-y-2">
+          <div className="h-3 bg-gray-100 rounded w-28" />
+          <div className="h-7 bg-gray-100 rounded w-20" />
+          <div className="h-2.5 bg-gray-100 rounded w-24" />
+        </div>
+        <div className="w-11 h-11 bg-gray-100 rounded-xl shrink-0 ml-3" />
+      </div>
     </div>
   );
 }
 
-function SkeletonList({ rows = 3 }: { rows?: number }) {
+function SkeletonRows({ n = 3 }: { n?: number }) {
   return (
-    <div className="space-y-3 animate-pulse">
-      {Array.from({ length: rows }).map((_, i) => (
+    <div className="space-y-2.5 animate-pulse">
+      {Array.from({ length: n }).map((_, i) => (
         <div key={i} className="bg-white rounded-xl p-4 border border-gray-100">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-          <div className="h-3 bg-gray-200 rounded w-1/2" />
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-gray-100 rounded-lg shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 bg-gray-100 rounded w-3/4" />
+              <div className="h-2.5 bg-gray-100 rounded w-1/2" />
+            </div>
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-// ─── Stat Card ───────────────────────────────────────────────────────────────
+// ── Stat card ──────────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   label: string;
   value: string | number;
   sub?: string;
   icon: React.ElementType;
-  iconBg: string;
-  iconColor: string;
-  trend?: { value: string; positive: boolean };
+  accent: string;       // Tailwind color class prefix, e.g. "blue"
+  trend?: string;
+  trendUp?: boolean;
 }
 
-function StatCard({ label, value, sub, icon: Icon, iconBg, iconColor, trend }: StatCardProps) {
+function StatCard({ label, value, sub, icon: Icon, accent, trend, trendUp }: StatCardProps) {
+  const accentMap: Record<string, { bg: string; iconBg: string; iconColor: string; trendColor: string }> = {
+    blue:    { bg: 'bg-blue-50/60',   iconBg: 'bg-blue-100',   iconColor: 'text-blue-600',   trendColor: 'text-blue-600' },
+    emerald: { bg: 'bg-emerald-50/60',iconBg: 'bg-emerald-100',iconColor: 'text-emerald-600',trendColor: 'text-emerald-600' },
+    orange:  { bg: 'bg-orange-50/60', iconBg: 'bg-orange-100', iconColor: 'text-orange-600', trendColor: 'text-orange-600' },
+    red:     { bg: 'bg-red-50/60',    iconBg: 'bg-red-100',    iconColor: 'text-red-500',    trendColor: 'text-red-500' },
+  };
+  const a = accentMap[accent] ?? accentMap.blue;
+
   return (
-    <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-500 font-medium">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-          {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+    <div className={cn('rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 group', a.bg, 'bg-white')}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-1.5 leading-none">{value}</p>
+          {sub && <p className="text-xs text-gray-400 mt-1.5">{sub}</p>}
           {trend && (
-            <p className={cn('text-xs mt-1 font-medium', trend.positive ? 'text-green-600' : 'text-red-500')}>
-              {trend.positive ? '↑' : '↓'} {trend.value}
+            <p className={cn('flex items-center gap-1 text-xs mt-1.5 font-semibold', a.trendColor)}>
+              {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {trend}
             </p>
           )}
         </div>
-        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ml-3', iconBg)}>
-          <Icon className={cn('w-5 h-5', iconColor)} />
+        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center shrink-0', a.iconBg)}>
+          <Icon className={cn('w-5 h-5', a.iconColor)} />
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Priority Badge ───────────────────────────────────────────────────────────
+// ── Priority badge ─────────────────────────────────────────────────────────────
 
-const PRIORITY_STYLES: Record<string, string> = {
-  HIGH: 'bg-red-100 text-red-700',
-  MEDIUM: 'bg-orange-100 text-orange-700',
-  LOW: 'bg-green-100 text-green-700',
-};
-
-function PriorityBadge({ priority }: { priority: string }) {
+function PriorityDot({ priority }: { priority: string }) {
   return (
-    <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full', PRIORITY_STYLES[priority] ?? 'bg-gray-100 text-gray-600')}>
+    <span className={cn(
+      'inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full',
+      priority === 'HIGH'   ? 'bg-red-50 text-red-700 ring-1 ring-red-200' :
+      priority === 'MEDIUM' ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' :
+                              'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
+    )}>
+      <span className={cn(
+        'w-1.5 h-1.5 rounded-full',
+        priority === 'HIGH' ? 'bg-red-500' : priority === 'MEDIUM' ? 'bg-orange-500' : 'bg-emerald-500',
+      )} />
       {priority}
     </span>
   );
 }
 
-// ─── Meal Status Badge ────────────────────────────────────────────────────────
+// ── Meal status badge ──────────────────────────────────────────────────────────
 
-const MEAL_STATUS_STYLES: Record<string, string> = {
-  PLANNED: 'bg-blue-100 text-blue-700',
-  COMPLETED: 'bg-green-100 text-green-700',
-  SKIPPED: 'bg-gray-100 text-gray-600',
-  CHANGED: 'bg-orange-100 text-orange-700',
-};
-
-function MealStatusBadge({ status }: { status: string }) {
+function MealBadge({ status }: { status: string }) {
   return (
-    <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full', MEAL_STATUS_STYLES[status] ?? 'bg-gray-100 text-gray-600')}>
+    <span className={cn(
+      'text-[11px] font-semibold px-2 py-0.5 rounded-full',
+      status === 'PLANNED'   ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' :
+      status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' :
+      status === 'SKIPPED'   ? 'bg-gray-100 text-gray-500 ring-1 ring-gray-200' :
+                               'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
+    )}>
       {status}
     </span>
   );
 }
 
-// ─── Quick Action Card ────────────────────────────────────────────────────────
+// ── Quick action ───────────────────────────────────────────────────────────────
 
-function QuickAction({ href, label, icon: Icon, color }: {
-  href: string;
-  label: string;
-  icon: React.ElementType;
-  color: string;
+function QuickAction({ href, label, icon: Icon, gradient }: {
+  href: string; label: string; icon: React.ElementType; gradient: string;
 }) {
   return (
-    <Link
-      href={href}
-      className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-100 hover:border-green-200 hover:shadow-md transition-all group"
-    >
-      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-colors', color)}>
+    <Link href={href} className="group relative overflow-hidden rounded-xl p-4 border border-gray-100 bg-white hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col items-center gap-2.5">
+      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shadow-sm', gradient)}>
         <Icon className="w-5 h-5 text-white" />
       </div>
-      <span className="text-xs font-medium text-gray-700 text-center leading-tight">{label}</span>
+      <span className="text-xs font-semibold text-gray-700 text-center leading-tight">{label}</span>
     </Link>
   );
 }
 
-// ─── No Family prompt ─────────────────────────────────────────────────────────
+// ── Section wrapper ────────────────────────────────────────────────────────────
+
+function Section({ title, icon: Icon, iconClass, href, hrefLabel = 'View all', children }: {
+  title: string;
+  icon: React.ElementType;
+  iconClass: string;
+  href?: string;
+  hrefLabel?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-3.5">
+        <div className="flex items-center gap-2">
+          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', iconClass)}>
+            <Icon className="w-3.5 h-3.5" />
+          </div>
+          <h2 className="section-title">{title}</h2>
+        </div>
+        {href && (
+          <Link href={href} className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-semibold transition-colors">
+            {hrefLabel} <ArrowUpRight className="w-3.5 h-3.5" />
+          </Link>
+        )}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// ── Empty state ────────────────────────────────────────────────────────────────
+
+function Empty({ icon: Icon, message, cta, ctaHref }: {
+  icon: React.ElementType; message: string; cta?: string; ctaHref?: string;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 px-6 py-8 text-center">
+      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+        <Icon className="w-5 h-5 text-gray-400" />
+      </div>
+      <p className="text-sm text-gray-500">{message}</p>
+      {cta && ctaHref && (
+        <Link href={ctaHref} className="inline-flex items-center gap-1 mt-3 text-xs text-emerald-600 font-semibold hover:text-emerald-700">
+          <Plus className="w-3.5 h-3.5" /> {cta}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+// ── No family ──────────────────────────────────────────────────────────────────
 
 function NoFamilyPrompt() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] px-6 text-center">
-      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-        <Sparkles className="w-8 h-8 text-green-600" />
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6 fade-in">
+      <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-emerald-200">
+        <Sparkles className="w-8 h-8 text-white" />
       </div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">No Family Selected</h2>
-      <p className="text-gray-500 mb-6 max-w-sm">
-        Create or join a family group to start tracking meals, inventory, and reduce food waste.
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Set up your family</h2>
+      <p className="text-gray-500 text-sm mb-6 max-w-xs leading-relaxed">
+        Create or join a family to unlock meal planning, shared inventory, and AI recommendations.
       </p>
       <div className="flex gap-3">
-        <Link
-          href="/settings"
-          className="px-5 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
-        >
-          Create a Family
-        </Link>
-        <Link
-          href="/settings"
-          className="px-5 py-2.5 border border-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-        >
-          Join with Code
-        </Link>
+        <Link href="/settings" className="btn-primary btn-md">Create a Family</Link>
+        <Link href="/settings" className="btn-outline btn-md">Join with Code</Link>
       </div>
     </div>
   );
 }
 
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+// ── Dashboard ──────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { selectedFamilyId: familyId } = useFamily();
-
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+  const { data: analytics, isLoading: aLoading } = useQuery({
     queryKey: ['analytics-dashboard', familyId],
     queryFn: () => analyticsApi.getDashboard(familyId!).then((r) => r.data.data),
     enabled: !!familyId,
   });
 
-  const { data: aiSuggestions, isLoading: suggestionsLoading } = useQuery({
+  const { data: aiSuggestions, isLoading: sLoading } = useQuery({
     queryKey: ['ai-suggestions', familyId],
     queryFn: () => aiApi.getSuggestions(familyId!).then((r) => r.data.data),
     enabled: !!familyId,
   });
 
-  const { data: fruitAlerts, isLoading: fruitsLoading } = useQuery({
+  const { data: fruitAlerts, isLoading: fLoading } = useQuery({
     queryKey: ['fruit-alerts', familyId],
     queryFn: () => fruitsApi.getAlerts(familyId!).then((r) => r.data.data),
     enabled: !!familyId,
   });
 
-  const { data: todayMeals, isLoading: mealsLoading } = useQuery({
+  const { data: todayMeals, isLoading: mLoading } = useQuery({
     queryKey: ['meals-today', familyId, today],
     queryFn: () =>
-      mealsApi
-        .list({ familyId, startDate: today, endDate: today })
-        .then((r) => {
-          const list = Array.isArray(r.data.data) ? r.data.data : [];
-          return list.map((m: any) => ({ ...m, date: m.scheduledAt ?? m.date }));
-        }),
+      mealsApi.list({ familyId, startDate: today, endDate: today }).then((r) => {
+        const list = Array.isArray(r.data.data) ? r.data.data : [];
+        return list.map((m: any) => ({ ...m, date: m.scheduledAt ?? m.date }));
+      }),
     enabled: !!familyId,
   });
 
@@ -215,153 +253,98 @@ export default function DashboardPage() {
     </>
   );
 
-  // Normalize nested analytics into flat stat fields the UI expects
-  const rawAnalytics = analytics ?? ({} as any);
+  const raw = analytics ?? ({} as any);
   const stats = {
-    totalInventoryItems: rawAnalytics.inventory?.totalItems ?? 0,
-    totalInventoryValue: rawAnalytics.inventory?.totalValue ?? 0,
-    expiringCount: rawAnalytics.inventory?.expiringSoonCount ?? rawAnalytics.inventory?.expiringSoon ?? 0,
-    monthlyWasteCost: rawAnalytics.waste?.wasteCostThisMonth ?? rawAnalytics.waste?.monthlyWasteCost ?? 0,
+    totalItems:   raw.inventory?.totalItems ?? 0,
+    totalValue:   raw.inventory?.totalValue ?? 0,
+    expiring:     raw.inventory?.expiringSoonCount ?? raw.inventory?.expiringSoon ?? 0,
+    wasteCost:    raw.waste?.wasteCostThisMonth ?? raw.waste?.monthlyWasteCost ?? 0,
   };
+
+  const suggestions: any[] = Array.isArray(aiSuggestions) ? aiSuggestions : [];
+  const alerts: any[] = Array.isArray(fruitAlerts) ? fruitAlerts : [];
+  const meals: any[] = Array.isArray(todayMeals) ? todayMeals : [];
 
   return (
     <>
-      <Header title="Dashboard" description="Your smart food & grocery overview" />
+      <Header title="Dashboard" description={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}! Here's your overview.`} />
 
-      <div className="p-6 space-y-8 max-w-7xl mx-auto">
+      <div className="p-6 space-y-7 max-w-7xl fade-in">
 
-        {/* ── Stat Cards ── */}
-        <section>
-          {analyticsLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              {[0, 1, 2, 3].map((i) => <SkeletonCard key={i} />)}
-            </div>
+        {/* ── Stats ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {aLoading ? (
+            [0,1,2,3].map((i) => <SkeletonStatCard key={i} />)
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              <StatCard
-                label="Total Inventory Items"
-                value={stats.totalInventoryItems ?? 0}
-                sub="items in stock"
-                icon={Package}
-                iconBg="bg-blue-50"
-                iconColor="text-blue-600"
-              />
-              <StatCard
-                label="Total Inventory Value"
-                value={formatCurrency(stats.totalInventoryValue ?? 0)}
-                sub="estimated value"
-                icon={DollarSign}
-                iconBg="bg-green-50"
-                iconColor="text-green-600"
-              />
-              <StatCard
-                label="Expiring Soon"
-                value={stats.expiringCount ?? 0}
-                sub="items expiring in 3 days"
-                icon={AlertTriangle}
-                iconBg="bg-orange-50"
-                iconColor="text-orange-600"
-              />
-              <StatCard
-                label="Monthly Waste Cost"
-                value={formatCurrency(stats.monthlyWasteCost ?? 0)}
-                sub="wasted this month"
-                icon={TrendingDown}
-                iconBg="bg-red-50"
-                iconColor="text-red-500"
-              />
-            </div>
+            <>
+              <StatCard label="Inventory Items" value={stats.totalItems} sub="items in stock" icon={Package} accent="blue" />
+              <StatCard label="Inventory Value" value={formatCurrency(stats.totalValue)} sub="estimated worth" icon={IndianRupee} accent="emerald" trendUp trend="Current value" />
+              <StatCard label="Expiring Soon" value={stats.expiring} sub="within 3 days" icon={AlertTriangle} accent="orange" />
+              <StatCard label="Waste This Month" value={formatCurrency(stats.wasteCost)} sub="food cost wasted" icon={TrendingDown} accent="red" />
+            </>
           )}
-        </section>
+        </div>
 
-        {/* ── Main content grid ── */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        {/* ── Main grid ── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-          {/* Left column: AI + Fruit Alerts */}
-          <div className="xl:col-span-2 space-y-8">
+          {/* Left: AI + Fruit Alerts */}
+          <div className="xl:col-span-2 space-y-6">
 
             {/* AI Suggestions */}
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-green-600" />
-                  <h2 className="text-base font-bold text-gray-900">AI Suggestions</h2>
-                </div>
-                <Link href="/ai-suggestions" className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
-                  View all <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
-
-              {suggestionsLoading ? (
+            <Section title="AI Suggestions" icon={Sparkles} iconClass="bg-purple-100 text-purple-600" href="/ai-suggestions">
+              {sLoading ? (
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {[0, 1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+                  {[0,1,2,3].map((i) => <SkeletonStatCard key={i} />)}
                 </div>
-              ) : aiSuggestions && aiSuggestions.length > 0 ? (
+              ) : suggestions.length > 0 ? (
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {(aiSuggestions as any[]).slice(0, 4).map((suggestion: any, idx: number) => (
-                    <div
-                      key={suggestion.id ?? idx}
-                      className="bg-white rounded-xl p-4 border border-gray-100 hover:border-green-200 transition-colors shadow-sm"
-                    >
+                  {suggestions.slice(0, 4).map((s: any, i: number) => (
+                    <div key={s.id ?? i} className="card-hover p-4 group cursor-pointer">
                       <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-sm font-semibold text-gray-900 leading-snug">{suggestion.title ?? suggestion.type}</p>
-                        <PriorityBadge priority={suggestion.priority ?? 'LOW'} />
+                        <p className="text-sm font-semibold text-gray-900 leading-snug flex-1">{s.title ?? s.type}</p>
+                        <PriorityDot priority={s.priority ?? 'LOW'} />
                       </div>
-                      <p className="text-xs text-gray-500 leading-relaxed">{suggestion.description ?? suggestion.message}</p>
+                      <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{s.description ?? s.message}</p>
+                      <div className="mt-3 flex items-center gap-1 text-[11px] text-emerald-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                        View details <ArrowUpRight className="w-3 h-3" />
+                      </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-xl p-8 border border-gray-100 text-center">
-                  <Sparkles className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No AI suggestions right now. Check back soon!</p>
-                </div>
+                <Empty icon={Sparkles} message="No suggestions right now. Add inventory to get AI-powered recommendations." />
               )}
-            </section>
+            </Section>
 
             {/* Fruit Alerts */}
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-orange-500" />
-                  <h2 className="text-base font-bold text-gray-900">Fruit Alerts</h2>
-                </div>
-                <Link href="/fruits" className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
-                  View all <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
-
-              {fruitsLoading ? (
-                <SkeletonList rows={2} />
-              ) : fruitAlerts && (fruitAlerts as any[]).length > 0 ? (
-                <div className="space-y-3">
-                  {(fruitAlerts as any[]).map((alert: any, idx: number) => (
-                    <div
-                      key={alert.id ?? idx}
-                      className={cn(
-                        'bg-white rounded-xl p-4 border flex items-start gap-3',
-                        alert.severity === 'HIGH' ? 'border-red-200 bg-red-50' :
-                        alert.severity === 'MEDIUM' ? 'border-orange-200 bg-orange-50' :
-                        'border-yellow-200 bg-yellow-50'
-                      )}
-                    >
+            <Section title="Fruit Alerts" icon={Bell} iconClass="bg-orange-100 text-orange-600" href="/fruits">
+              {fLoading ? (
+                <SkeletonRows n={2} />
+              ) : alerts.length > 0 ? (
+                <div className="space-y-2.5">
+                  {alerts.map((a: any, i: number) => (
+                    <div key={a.id ?? i} className={cn(
+                      'rounded-xl p-4 border flex items-start gap-3',
+                      a.severity === 'HIGH'   ? 'bg-red-50 border-red-200' :
+                      a.severity === 'MEDIUM' ? 'bg-orange-50 border-orange-200' :
+                                                'bg-yellow-50 border-yellow-200',
+                    )}>
                       <div className={cn(
                         'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                        alert.severity === 'HIGH' ? 'bg-red-100' :
-                        alert.severity === 'MEDIUM' ? 'bg-orange-100' : 'bg-yellow-100'
+                        a.severity === 'HIGH' ? 'bg-red-100' : a.severity === 'MEDIUM' ? 'bg-orange-100' : 'bg-yellow-100',
                       )}>
                         <AlertTriangle className={cn(
                           'w-4 h-4',
-                          alert.severity === 'HIGH' ? 'text-red-600' :
-                          alert.severity === 'MEDIUM' ? 'text-orange-600' : 'text-yellow-600'
+                          a.severity === 'HIGH' ? 'text-red-600' : a.severity === 'MEDIUM' ? 'text-orange-600' : 'text-yellow-600',
                         )} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{alert.fruitName ?? alert.title}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{alert.message ?? alert.description}</p>
-                        {alert.ripenessLevel && (
-                          <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-white rounded-full border text-gray-600">
-                            {alert.ripenessLevel}
+                        <p className="text-sm font-semibold text-gray-900">{a.fruitName ?? a.title}</p>
+                        <p className="text-xs text-gray-600 mt-0.5">{a.message ?? a.description}</p>
+                        {a.ripenessLevel && (
+                          <span className="inline-block mt-1.5 text-[11px] font-medium px-2 py-0.5 bg-white/80 rounded-full border text-gray-600">
+                            {a.ripenessLevel}
                           </span>
                         )}
                       </div>
@@ -369,74 +352,87 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-xl p-6 border border-gray-100 text-center">
-                  <p className="text-sm text-gray-500">No fruit alerts. All fruits are in good condition!</p>
-                </div>
+                <Empty icon={Bell} message="All fruits are in good condition. No alerts!" />
               )}
-            </section>
+            </Section>
           </div>
 
-          {/* Right column: Today's Meals + Quick Actions */}
-          <div className="space-y-8">
+          {/* Right: Today's Meals + Quick Actions */}
+          <div className="space-y-6">
 
             {/* Today's Meals */}
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Utensils className="w-5 h-5 text-green-600" />
-                  <h2 className="text-base font-bold text-gray-900">Today's Meals</h2>
-                </div>
-                <Link href="/meal-planner" className="text-sm text-green-600 hover:text-green-700 font-medium flex items-center gap-1">
-                  Plan <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
+            <Section title="Today's Meals" icon={Utensils} iconClass="bg-emerald-100 text-emerald-600" href="/meal-planner" hrefLabel="Plan">
+              {mLoading ? (
+                <SkeletonRows n={3} />
+              ) : meals.length > 0 ? (
+                <div className="space-y-2.5">
+                  {meals.map((meal: any) => {
+                    const mealTypeColors: Record<string, string> = {
+                      BREAKFAST: 'bg-yellow-100 text-yellow-700',
+                      LUNCH:     'bg-blue-100 text-blue-700',
+                      DINNER:    'bg-purple-100 text-purple-700',
+                      SNACK:     'bg-pink-100 text-pink-700',
+                    };
+                    const typeColor = mealTypeColors[meal.mealType] ?? 'bg-gray-100 text-gray-600';
 
-              {mealsLoading ? (
-                <SkeletonList rows={3} />
-              ) : todayMeals && (todayMeals as any[]).length > 0 ? (
-                <div className="space-y-3">
-                  {(todayMeals as any[]).map((meal: any) => (
-                    <div
-                      key={meal.id}
-                      className="bg-white rounded-xl p-4 border border-gray-100 hover:border-green-200 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {meal.recipe?.name ?? meal.customMealName ?? 'Unnamed Meal'}
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5 capitalize">
-                            {meal.mealType?.toLowerCase()} · {meal.servings} servings
-                          </p>
+                    return (
+                      <div key={meal.id} className="card-hover p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {meal.recipe?.name ?? meal.customMealName ?? 'Unnamed Meal'}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full', typeColor)}>
+                                {meal.mealType?.toLowerCase()}
+                              </span>
+                              <span className="text-[11px] text-gray-400">{meal.servings} servings</span>
+                            </div>
+                          </div>
+                          <MealBadge status={meal.status ?? 'PLANNED'} />
                         </div>
-                        <MealStatusBadge status={meal.status ?? 'PLANNED'} />
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="bg-white rounded-xl p-6 border border-gray-100 text-center">
-                  <Utensils className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 mb-3">No meals planned for today.</p>
-                  <Link
-                    href="/meal-planner"
-                    className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700 font-medium"
-                  >
-                    <Plus className="w-4 h-4" /> Add meals
-                  </Link>
-                </div>
+                <Empty icon={Utensils} message="No meals planned today." cta="Add meals" ctaHref="/meal-planner" />
               )}
-            </section>
+            </Section>
 
             {/* Quick Actions */}
             <section>
-              <h2 className="text-base font-bold text-gray-900 mb-4">Quick Actions</h2>
+              <h2 className="section-title mb-3.5">Quick Actions</h2>
               <div className="grid grid-cols-2 gap-3">
-                <QuickAction href="/inventory" label="Add Grocery" icon={Plus} color="bg-green-600 group-hover:bg-green-700" />
-                <QuickAction href="/meal-planner" label="Plan Meals" icon={Calendar} color="bg-blue-600 group-hover:bg-blue-700" />
-                <QuickAction href="/shopping" label="Shopping List" icon={ShoppingCart} color="bg-purple-600 group-hover:bg-purple-700" />
-                <QuickAction href="/waste" label="Log Waste" icon={Trash2} color="bg-red-500 group-hover:bg-red-600" />
+                <QuickAction href="/inventory"    label="Add Grocery"     icon={Plus}         gradient="bg-gradient-to-br from-emerald-500 to-teal-600" />
+                <QuickAction href="/meal-planner" label="Plan Meals"      icon={Calendar}     gradient="bg-gradient-to-br from-blue-500 to-blue-600" />
+                <QuickAction href="/shopping"     label="Shopping List"   icon={ShoppingCart} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
+                <QuickAction href="/waste"        label="Log Waste"       icon={Trash2}       gradient="bg-gradient-to-br from-red-500 to-rose-600" />
               </div>
+            </section>
+
+            {/* Mini chart placeholder / stats strip */}
+            <section>
+              <Link href="/analytics" className="block card-hover p-4 bg-gradient-to-br from-slate-800 to-slate-900">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Analytics</p>
+                    <p className="text-sm font-bold text-white mt-0.5">View full report</p>
+                  </div>
+                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+                    <ChevronRight className="w-4 h-4 text-white" />
+                  </div>
+                </div>
+                <div className="flex items-end gap-1 h-10">
+                  {[4, 7, 5, 8, 6, 9, 7, 10, 8, 6, 9, 11].map((h, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 rounded-sm bg-emerald-500/60 transition-all"
+                      style={{ height: `${(h / 11) * 100}%` }}
+                    />
+                  ))}
+                </div>
+              </Link>
             </section>
           </div>
         </div>
