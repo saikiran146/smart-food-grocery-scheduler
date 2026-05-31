@@ -122,7 +122,7 @@ export class NotificationsService {
         type,
         title,
         message,
-        data: data ?? undefined,
+        data: (data as any) ?? undefined,
         status: NotificationStatus.PENDING,
       },
     });

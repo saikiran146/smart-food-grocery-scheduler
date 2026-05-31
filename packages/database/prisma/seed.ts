@@ -270,10 +270,15 @@ async function main() {
   for (const recipe of recipes) {
     const { ingredients: recipeIngredients, ...recipeData } = recipe;
 
-    const created = await prisma.recipe.upsert({
-      where: { name: recipe.name } as any,
-      update: {},
-      create: {
+    // Skip if already seeded
+    const existing = await prisma.recipe.findFirst({ where: { name: recipe.name } });
+    if (existing) {
+      createdIngredients[`recipe:${recipe.name}`] = existing;
+      continue;
+    }
+
+    const created = await prisma.recipe.create({
+      data: {
         ...recipeData,
         instructions: recipeData.instructions,
         tags: recipeData.tags,
