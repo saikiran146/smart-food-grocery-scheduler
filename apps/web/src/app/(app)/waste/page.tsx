@@ -109,7 +109,21 @@ export default function WastePage() {
   const { data: summaryData, isLoading: summaryLoading } = useQuery({
     queryKey: ['waste-summary', selectedFamilyId, currentMonth, currentYear],
     queryFn: () =>
-      wasteApi.getSummary(selectedFamilyId!, currentMonth, currentYear).then((r) => r.data.data),
+      wasteApi.getSummary(selectedFamilyId!, currentMonth, currentYear).then((r) => {
+        const d = r.data.data;
+        if (!d) return d;
+        // Normalize backend field names to WasteSummary shape
+        return {
+          totalWasteCost: d.totalWasteCost,
+          wastePercentage: d.monthlyWastePercent ?? d.wastePercentage ?? 0,
+          mostWastedItem: d.mostWastedItems?.[0]?.name ?? d.mostWastedItem,
+          byCategory: (d.wasteByCategory ?? d.byCategory ?? []).map((c: any) => ({
+            category: c.category,
+            count: c.count ?? 1,
+            cost: c.cost ?? 0,
+          })),
+        };
+      }),
     enabled: !!selectedFamilyId,
   });
 

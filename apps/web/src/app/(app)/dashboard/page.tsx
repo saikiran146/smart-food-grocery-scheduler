@@ -199,7 +199,12 @@ export default function DashboardPage() {
   const { data: todayMeals, isLoading: mealsLoading } = useQuery({
     queryKey: ['meals-today', familyId, today],
     queryFn: () =>
-      mealsApi.list({ familyId, date: today }).then((r) => r.data.data),
+      mealsApi
+        .list({ familyId, startDate: today, endDate: today })
+        .then((r) => {
+          const list = Array.isArray(r.data.data) ? r.data.data : [];
+          return list.map((m: any) => ({ ...m, date: m.scheduledAt ?? m.date }));
+        }),
     enabled: !!familyId,
   });
 
@@ -210,7 +215,14 @@ export default function DashboardPage() {
     </>
   );
 
-  const stats = analytics ?? {};
+  // Normalize nested analytics into flat stat fields the UI expects
+  const rawAnalytics = analytics ?? ({} as any);
+  const stats = {
+    totalInventoryItems: rawAnalytics.inventory?.totalItems ?? 0,
+    totalInventoryValue: rawAnalytics.inventory?.totalValue ?? 0,
+    expiringCount: rawAnalytics.inventory?.expiringSoonCount ?? rawAnalytics.inventory?.expiringSoon ?? 0,
+    monthlyWasteCost: rawAnalytics.waste?.wasteCostThisMonth ?? rawAnalytics.waste?.monthlyWasteCost ?? 0,
+  };
 
   return (
     <>

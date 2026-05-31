@@ -78,7 +78,7 @@ export class RecipesService {
     ]);
 
     return {
-      data: recipes,
+      items: recipes,
       meta: {
         total,
         page,

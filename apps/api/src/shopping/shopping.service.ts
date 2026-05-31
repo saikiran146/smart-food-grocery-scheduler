@@ -42,6 +42,7 @@ export class ShoppingService {
       where: { familyId },
       include: {
         user: { select: { id: true, name: true } },
+        items: { orderBy: [{ isPurchased: 'asc' }, { name: 'asc' }] },
         _count: { select: { items: true } },
       },
       orderBy: { createdAt: 'desc' },

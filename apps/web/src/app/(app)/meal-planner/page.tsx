@@ -103,7 +103,7 @@ function AddMealModal({ open, onClose, prefillDate, prefillMealType, familyId }:
 
   const { data: recipes } = useQuery({
     queryKey: ['recipes', recipeSearch],
-    queryFn: () => recipesApi.list({ search: recipeSearch, familyId }).then((r) => r.data.data as any[]),
+    queryFn: () => recipesApi.list({ search: recipeSearch, familyId }).then((r) => (r.data.data.items ?? r.data.data) as any[]),
     enabled: !useCustom,
   });
 
@@ -119,7 +119,7 @@ function AddMealModal({ open, onClose, prefillDate, prefillMealType, familyId }:
     e.preventDefault();
     createMeal.mutate({
       familyId,
-      date,
+      scheduledAt: date,
       mealType,
       servings,
       ...(useCustom
@@ -561,7 +561,11 @@ export default function MealPlannerPage() {
           startDate: format(weekStart, 'yyyy-MM-dd'),
           endDate: format(weekEnd, 'yyyy-MM-dd'),
         })
-        .then((r) => r.data.data as Meal[]),
+        .then((r) => {
+          const list = Array.isArray(r.data.data) ? r.data.data : [];
+          // Normalize scheduledAt → date
+          return list.map((m: any) => ({ ...m, date: m.scheduledAt ?? m.date })) as Meal[];
+        }),
     enabled: !!familyId && viewMode === 'week',
   });
 
@@ -571,7 +575,17 @@ export default function MealPlannerPage() {
     queryFn: () =>
       mealsApi
         .getCalendar(familyId!, currentDate.getFullYear(), currentDate.getMonth() + 1)
-        .then((r) => r.data.data as Meal[]),
+        .then((r) => {
+          const calData = r.data.data;
+          // getCalendar returns { calendar: Record<dateStr, MealEntry[]>, ... }
+          // Flatten to array with a date field for the views
+          if (calData && typeof calData === 'object' && calData.calendar) {
+            return Object.entries(calData.calendar as Record<string, any[]>).flatMap(
+              ([dateStr, entries]) => entries.map((e: any) => ({ ...e, date: e.scheduledAt ?? dateStr }))
+            ) as Meal[];
+          }
+          return (Array.isArray(calData) ? calData : []) as Meal[];
+        }),
     enabled: !!familyId && viewMode === 'month',
   });
 

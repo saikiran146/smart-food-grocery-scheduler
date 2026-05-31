@@ -99,7 +99,20 @@ export default function FruitsPage() {
 
   const { data: fruitsData, isLoading: fruitsLoading } = useQuery({
     queryKey: ['fruits', selectedFamilyId],
-    queryFn: () => fruitsApi.list(selectedFamilyId!).then((r) => r.data.data),
+    queryFn: () =>
+      fruitsApi.list(selectedFamilyId!).then((r) => {
+        const list = Array.isArray(r.data.data) ? r.data.data : [];
+        // Normalize backend field names to FruitItem shape
+        return list.map((f: any) => ({
+          ...f,
+          quantity: f.remainingQty ?? f.quantity,
+          originalQuantity: f.quantity,
+          ripenessLevel: f.ripnessLevel ?? f.ripenessLevel,
+          expectedRipeDate: f.expiryDate ?? f.expectedRipeDate,
+          purchaseDate: f.purchaseDate,
+          costPerPiece: f.costPerPiece,
+        })) as FruitItem[];
+      }),
     enabled: !!selectedFamilyId,
   });
 
@@ -139,7 +152,7 @@ export default function FruitsPage() {
 
   const updateRipenessMutation = useMutation({
     mutationFn: ({ id, ripenessLevel }: { id: string; ripenessLevel: string }) =>
-      fruitsApi.update(id, { ripenessLevel }),
+      fruitsApi.update(id, { ripnessLevel: ripenessLevel }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fruits'] });
       setUpdateRipenessTarget(null);

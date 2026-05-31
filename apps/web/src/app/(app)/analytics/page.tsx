@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Header } from '@/components/layout/Header';
 import { analyticsApi } from '@/lib/api/endpoints';
+import { apiClient } from '@/lib/api/client';
 import { useFamily } from '@/hooks/useFamily';
 import { formatCurrency } from '@/lib/utils/format';
 import { GROCERY_CATEGORIES } from '@/lib/constants';
@@ -127,7 +128,10 @@ export default function AnalyticsPage() {
 
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ['analytics-dashboard', selectedFamilyId, month, year],
-    queryFn: () => analyticsApi.getDashboard(selectedFamilyId!).then((r) => r.data.data),
+    queryFn: () =>
+      apiClient
+        .get('/analytics/dashboard', { params: { familyId: selectedFamilyId, month, year } })
+        .then((r) => r.data.data),
     enabled: !!selectedFamilyId,
   });
 
@@ -149,11 +153,70 @@ export default function AnalyticsPage() {
     enabled: !!selectedFamilyId && (activeTab === 'budget' || activeTab === 'overview'),
   });
 
+  // Normalize backend field names to what the UI expects
+  function normalizeInventory(raw: any) {
+    if (!raw) return {};
+    return {
+      totalItems: raw.totalItems,
+      totalValue: raw.totalValue,
+      expiringSoon: raw.expiringSoonCount ?? raw.expiringSoon,
+      expired: raw.expiredCount ?? raw.expired,
+    };
+  }
+  function normalizeConsumption(raw: any) {
+    if (!raw) return {};
+    return {
+      topItems: (raw.topConsumedItems ?? raw.topItems ?? []).map((i: any) => ({
+        name: i.name,
+        quantity: i.quantity,
+        unit: i.unit ?? i.category ?? '',
+      })),
+      weeklyUsage: (raw.weeklyUsageChart ?? raw.weeklyUsage ?? []).map((d: any) => ({
+        day: d.date ?? d.day,
+        value: d.quantity ?? d.value ?? 0,
+      })),
+    };
+  }
+  function normalizeWaste(raw: any) {
+    if (!raw) return {};
+    return {
+      monthlyWastePercentage: raw.wastePercentage ?? raw.monthlyWastePercentage,
+      wastePercentageTrend: raw.wastePercentageTrend ?? null,
+      byCategory: (raw.wasteByCategory ?? raw.byCategory ?? []).map((c: any) => ({
+        category: c.category,
+        cost: c.cost ?? c.value ?? 0,
+        value: c.quantity ?? c.value ?? 0,
+      })),
+      topWastedItems: (raw.mostWastedItems ?? raw.topWastedItems ?? []).map((i: any) => ({
+        name: i.name,
+        count: i.count ?? 1,
+        cost: i.cost ?? 0,
+      })),
+    };
+  }
+  function normalizeBudget(raw: any) {
+    if (!raw) return {};
+    return {
+      monthlySpend: raw.monthlySpend,
+      monthlyBudget: raw.budgetAmount ?? raw.monthlyBudget ?? 0,
+      predictedSpend: raw.predictedSpend,
+      byCategory: (raw.spendByCategory ?? raw.byCategory ?? []).map((c: any) => ({
+        category: c.category,
+        spend: c.amount ?? c.spend ?? 0,
+      })),
+    };
+  }
+
   const dashboard: AnalyticsDashboard = dashboardData || {};
-  const inventory = dashboard.inventory || consumptionData?.inventory || {};
-  const consumption = dashboard.consumption || consumptionData || {};
-  const waste = dashboard.waste || wasteData || {};
-  const budget = dashboard.budget || budgetData || {};
+  const rawInventory = (dashboard as any).inventory || {};
+  const rawConsumption = (dashboard as any).consumption || consumptionData || {};
+  const rawWaste = (dashboard as any).waste || wasteData || {};
+  const rawBudget = (dashboard as any).budget || budgetData || {};
+
+  const inventory = normalizeInventory(rawInventory);
+  const consumption = normalizeConsumption(rawConsumption);
+  const waste = normalizeWaste(rawWaste);
+  const budget = normalizeBudget(rawBudget);
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'overview', label: 'Overview', icon: BarChart2 },

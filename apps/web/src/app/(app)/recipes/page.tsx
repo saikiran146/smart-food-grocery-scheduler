@@ -210,7 +210,7 @@ export default function RecipesPage() {
           isVegetarian: filterVeg != null ? filterVeg : undefined,
           cuisine: filterCuisine || undefined,
         })
-        .then((r) => r.data.data),
+        .then((r) => r.data.data.items ?? r.data.data),
     staleTime: 30000,
   });
 

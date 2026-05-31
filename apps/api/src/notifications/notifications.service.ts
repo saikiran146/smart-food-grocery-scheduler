@@ -40,7 +40,7 @@ export class NotificationsService {
     ]);
 
     return {
-      data: notifications,
+      items: notifications,
       meta: {
         total,
         page,

@@ -524,10 +524,14 @@ export default function InventoryPage() {
     enabled: !!familyId,
   });
 
-  // Fetch shortages
+  // Fetch shortages — backend returns { familyId, days, totalMealsPlanned, shortages: [...] }
   const { data: shortages } = useQuery({
     queryKey: ['inventory-shortages', familyId],
-    queryFn: () => inventoryApi.getShortages(familyId!).then((r) => r.data.data as any[]),
+    queryFn: () =>
+      inventoryApi.getShortages(familyId!).then((r) => {
+        const d = r.data.data;
+        return (Array.isArray(d) ? d : d?.shortages ?? []) as any[];
+      }),
     enabled: !!familyId,
   });
 
