@@ -24,7 +24,7 @@ import {
   fruitsApi,
   mealsApi,
 } from '@/lib/api/endpoints';
-import { formatCurrency, formatDate } from '@/lib/utils/format';
+import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
 import { format } from 'date-fns';
 

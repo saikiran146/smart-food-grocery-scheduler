@@ -21,7 +21,6 @@ import { inventoryApi } from '@/lib/api/endpoints';
 import { cn } from '@/lib/utils/cn';
 import {
   formatCurrency,
-  formatDate,
   getDaysUntilExpiry,
   isExpired,
   isExpiringSoon,
