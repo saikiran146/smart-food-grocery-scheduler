@@ -1,47 +1,92 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Package, TrendingDown, AlertTriangle, IndianRupee, Plus,
-  Calendar, ShoppingCart, Trash2, Sparkles, Bell, ChevronRight,
-  Utensils, TrendingUp, ArrowUpRight,
+  AreaChart, Area, ResponsiveContainer, Tooltip, CartesianGrid, XAxis, YAxis,
+} from 'recharts';
+import {
+  Package, TrendingDown, AlertTriangle, IndianRupee,
+  Plus, Calendar, ShoppingCart, Trash2, Sparkles, Bell,
+  ChevronRight, Utensils, ArrowUpRight, Zap,
 } from 'lucide-react';
+import { format } from 'date-fns';
+
 import { Header } from '@/components/layout/Header';
 import { useFamily } from '@/hooks/useFamily';
 import { analyticsApi, aiApi, fruitsApi, mealsApi } from '@/lib/api/endpoints';
 import { formatCurrency } from '@/lib/utils/format';
 import { cn } from '@/lib/utils/cn';
-import { format } from 'date-fns';
 
-// ── Skeletons ──────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-function SkeletonStatCard() {
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  sub: string;
+  icon: React.ElementType;
+  accent: 'blue' | 'emerald' | 'orange' | 'red';
+  pulseIcon?: boolean;
+  delay?: number;
+}
+
+// ─── Animation variants ───────────────────────────────────────────────────────
+
+const pageVariants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
+};
+
+const statVariants = {
+  hidden: { opacity: 0, y: 18 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.38, delay: i * 0.10, ease: [0.16, 1, 0.3, 1] },
+  }),
+};
+
+// ─── Accent map ───────────────────────────────────────────────────────────────
+
+const accentMap = {
+  blue:    { iconBg: 'bg-blue-100',    iconColor: 'text-blue-600',    ring: 'ring-blue-200' },
+  emerald: { iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', ring: 'ring-emerald-200' },
+  orange:  { iconBg: 'bg-orange-100',  iconColor: 'text-orange-600',  ring: 'ring-orange-200' },
+  red:     { iconBg: 'bg-red-100',     iconColor: 'text-red-500',     ring: 'ring-red-200' },
+};
+
+// ─── Skeleton components ──────────────────────────────────────────────────────
+
+function StatSkeleton() {
   return (
-    <div className="bg-white rounded-xl p-5 border border-gray-100 animate-pulse">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 space-y-2">
-          <div className="h-3 bg-gray-100 rounded w-28" />
-          <div className="h-7 bg-gray-100 rounded w-20" />
-          <div className="h-2.5 bg-gray-100 rounded w-24" />
+    <div className="card p-5 animate-pulse">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 space-y-2.5">
+          <div className="skeleton h-2.5 w-24 rounded" />
+          <div className="skeleton h-7 w-20 rounded" />
+          <div className="skeleton h-2.5 w-16 rounded" />
         </div>
-        <div className="w-11 h-11 bg-gray-100 rounded-xl shrink-0 ml-3" />
+        <div className="skeleton w-11 h-11 rounded-xl" />
       </div>
     </div>
   );
 }
 
-function SkeletonRows({ n = 3 }: { n?: number }) {
+function RowSkeleton({ n = 3 }: { n?: number }) {
   return (
-    <div className="space-y-2.5 animate-pulse">
+    <div className="space-y-2.5">
       {Array.from({ length: n }).map((_, i) => (
-        <div key={i} className="bg-white rounded-xl p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-100 rounded-lg shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="h-3 bg-gray-100 rounded w-3/4" />
-              <div className="h-2.5 bg-gray-100 rounded w-1/2" />
-            </div>
+        <div key={i} className="card p-4 animate-pulse flex items-center gap-3">
+          <div className="skeleton w-8 h-8 rounded-lg shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="skeleton h-3 w-3/4 rounded" />
+            <div className="skeleton h-2.5 w-1/2 rounded" />
           </div>
         </div>
       ))}
@@ -49,114 +94,96 @@ function SkeletonRows({ n = 3 }: { n?: number }) {
   );
 }
 
-// ── Stat card ──────────────────────────────────────────────────────────────────
-
-interface StatCardProps {
-  label: string;
-  value: string | number;
-  sub?: string;
-  icon: React.ElementType;
-  accent: string;       // Tailwind color class prefix, e.g. "blue"
-  trend?: string;
-  trendUp?: boolean;
-}
-
-function StatCard({ label, value, sub, icon: Icon, accent, trend, trendUp }: StatCardProps) {
-  const accentMap: Record<string, { bg: string; iconBg: string; iconColor: string; trendColor: string }> = {
-    blue:    { bg: 'bg-blue-50/60',   iconBg: 'bg-blue-100',   iconColor: 'text-blue-600',   trendColor: 'text-blue-600' },
-    emerald: { bg: 'bg-emerald-50/60',iconBg: 'bg-emerald-100',iconColor: 'text-emerald-600',trendColor: 'text-emerald-600' },
-    orange:  { bg: 'bg-orange-50/60', iconBg: 'bg-orange-100', iconColor: 'text-orange-600', trendColor: 'text-orange-600' },
-    red:     { bg: 'bg-red-50/60',    iconBg: 'bg-red-100',    iconColor: 'text-red-500',    trendColor: 'text-red-500' },
-  };
-  const a = accentMap[accent] ?? accentMap.blue;
-
+function CardSkeleton({ n = 4 }: { n?: number }) {
   return (
-    <div className={cn('rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 group', a.bg, 'bg-white')}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1.5 leading-none">{value}</p>
-          {sub && <p className="text-xs text-gray-400 mt-1.5">{sub}</p>}
-          {trend && (
-            <p className={cn('flex items-center gap-1 text-xs mt-1.5 font-semibold', a.trendColor)}>
-              {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              {trend}
-            </p>
-          )}
+    <div className="grid sm:grid-cols-2 gap-3">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} className="card p-4 animate-pulse space-y-2">
+          <div className="flex justify-between">
+            <div className="skeleton h-3 w-32 rounded" />
+            <div className="skeleton h-5 w-14 rounded-full" />
+          </div>
+          <div className="skeleton h-2.5 w-full rounded" />
+          <div className="skeleton h-2.5 w-2/3 rounded" />
         </div>
-        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center shrink-0', a.iconBg)}>
-          <Icon className={cn('w-5 h-5', a.iconColor)} />
-        </div>
-      </div>
+      ))}
     </div>
   );
 }
 
-// ── Priority badge ─────────────────────────────────────────────────────────────
+// ─── Stat Card ────────────────────────────────────────────────────────────────
 
-function PriorityDot({ priority }: { priority: string }) {
+function StatCard({ label, value, sub, icon: Icon, accent, pulseIcon, delay = 0 }: StatCardProps) {
+  const a = accentMap[accent];
   return (
-    <span className={cn(
-      'inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full',
-      priority === 'HIGH'   ? 'bg-red-50 text-red-700 ring-1 ring-red-200' :
-      priority === 'MEDIUM' ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-200' :
-                              'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200',
-    )}>
-      <span className={cn(
-        'w-1.5 h-1.5 rounded-full',
-        priority === 'HIGH' ? 'bg-red-500' : priority === 'MEDIUM' ? 'bg-orange-500' : 'bg-emerald-500',
-      )} />
-      {priority}
-    </span>
+    <motion.div
+      custom={delay}
+      variants={statVariants}
+      whileHover={{ y: -3, boxShadow: '0 10px 28px rgba(0,0,0,0.10)' }}
+      className={cn('card p-5 transition-shadow duration-200 cursor-default')}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest">{label}</p>
+          <p className="text-2xl font-bold text-gray-900 mt-2 leading-none tabular-nums">{value}</p>
+          <p className="text-xs text-gray-400 mt-1.5">{sub}</p>
+        </div>
+        <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ring-1 ring-inset', a.iconBg, a.ring)}>
+          <Icon
+            className={cn('w-5 h-5', a.iconColor, pulseIcon && 'animate-pulse')}
+          />
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
-// ── Meal status badge ──────────────────────────────────────────────────────────
+// ─── Priority Badge ───────────────────────────────────────────────────────────
 
-function MealBadge({ status }: { status: string }) {
-  return (
-    <span className={cn(
-      'text-[11px] font-semibold px-2 py-0.5 rounded-full',
-      status === 'PLANNED'   ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' :
-      status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' :
-      status === 'SKIPPED'   ? 'bg-gray-100 text-gray-500 ring-1 ring-gray-200' :
-                               'bg-orange-50 text-orange-700 ring-1 ring-orange-200',
-    )}>
-      {status}
-    </span>
-  );
+function PriorityBadge({ priority }: { priority: string }) {
+  const cls =
+    priority === 'HIGH'   ? 'badge-red' :
+    priority === 'MEDIUM' ? 'badge-amber' :
+                            'badge-green';
+  return <span className={cn('badge', cls)}>{priority}</span>;
 }
 
-// ── Quick action ───────────────────────────────────────────────────────────────
+// ─── Quick Action ─────────────────────────────────────────────────────────────
 
 function QuickAction({ href, label, icon: Icon, gradient }: {
   href: string; label: string; icon: React.ElementType; gradient: string;
 }) {
   return (
-    <Link href={href} className="group relative overflow-hidden rounded-xl p-4 border border-gray-100 bg-white hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex flex-col items-center gap-2.5">
-      <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shadow-sm', gradient)}>
-        <Icon className="w-5 h-5 text-white" />
-      </div>
-      <span className="text-xs font-semibold text-gray-700 text-center leading-tight">{label}</span>
+    <Link href={href}>
+      <motion.div
+        whileHover={{ scale: 1.03, boxShadow: '0 8px 20px rgba(0,0,0,0.12)' }}
+        whileTap={{ scale: 0.97 }}
+        className="card p-4 flex flex-col items-center gap-2.5 cursor-pointer transition-shadow duration-150"
+      >
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shadow-sm', gradient)}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        <span className="text-xs font-semibold text-gray-700 text-center leading-tight">{label}</span>
+      </motion.div>
     </Link>
   );
 }
 
-// ── Section wrapper ────────────────────────────────────────────────────────────
+// ─── Section wrapper ──────────────────────────────────────────────────────────
 
-function Section({ title, icon: Icon, iconClass, href, hrefLabel = 'View all', children }: {
+function Section({ title, icon: Icon, iconCls, href, hrefLabel = 'View all', children }: {
   title: string;
   icon: React.ElementType;
-  iconClass: string;
+  iconCls: string;
   href?: string;
   hrefLabel?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section>
+    <motion.section variants={fadeUp}>
       <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2">
-          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', iconClass)}>
+          <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', iconCls)}>
             <Icon className="w-3.5 h-3.5" />
           </div>
           <h2 className="section-title">{title}</h2>
@@ -168,23 +195,26 @@ function Section({ title, icon: Icon, iconClass, href, hrefLabel = 'View all', c
         )}
       </div>
       {children}
-    </section>
+    </motion.section>
   );
 }
 
-// ── Empty state ────────────────────────────────────────────────────────────────
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
 function Empty({ icon: Icon, message, cta, ctaHref }: {
-  icon: React.ElementType; message: string; cta?: string; ctaHref?: string;
+  icon: React.ElementType;
+  message: string;
+  cta?: string;
+  ctaHref?: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 px-6 py-8 text-center">
-      <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
+    <div className="card px-6 py-10 text-center">
+      <div className="w-11 h-11 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-3">
         <Icon className="w-5 h-5 text-gray-400" />
       </div>
       <p className="text-sm text-gray-500">{message}</p>
       {cta && ctaHref && (
-        <Link href={ctaHref} className="inline-flex items-center gap-1 mt-3 text-xs text-emerald-600 font-semibold hover:text-emerald-700">
+        <Link href={ctaHref} className="inline-flex items-center gap-1 mt-3 text-xs text-emerald-600 font-semibold hover:text-emerald-700 transition-colors">
           <Plus className="w-3.5 h-3.5" /> {cta}
         </Link>
       )}
@@ -192,31 +222,78 @@ function Empty({ icon: Icon, message, cta, ctaHref }: {
   );
 }
 
-// ── No family ──────────────────────────────────────────────────────────────────
+// ─── No-family State ──────────────────────────────────────────────────────────
 
-function NoFamilyPrompt() {
+function NoFamilyState() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6 fade-in">
-      <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center mb-5 shadow-lg shadow-emerald-200">
-        <Sparkles className="w-8 h-8 text-white" />
-      </div>
-      <h2 className="text-xl font-bold text-gray-900 mb-2">Set up your family</h2>
-      <p className="text-gray-500 text-sm mb-6 max-w-xs leading-relaxed">
-        Create or join a family to unlock meal planning, shared inventory, and AI recommendations.
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col items-center justify-center min-h-[62vh] text-center px-6"
+    >
+      <motion.div
+        animate={{ y: [0, -6, 0] }}
+        transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+        className="w-20 h-20 bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-500 rounded-3xl flex items-center justify-center mb-6 shadow-2xl shadow-emerald-300/50"
+      >
+        <Sparkles className="w-10 h-10 text-white" />
+      </motion.div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">Set up your family</h2>
+      <p className="text-gray-500 text-sm mb-8 max-w-sm leading-relaxed">
+        Create or join a family to unlock meal planning, shared inventory, AI-powered recommendations, and waste tracking.
       </p>
       <div className="flex gap-3">
-        <Link href="/settings" className="btn-primary btn-md">Create a Family</Link>
-        <Link href="/settings" className="btn-outline btn-md">Join with Code</Link>
+        <Link href="/settings" className="btn btn-primary btn-lg">
+          <Plus className="w-4 h-4" /> Create a Family
+        </Link>
+        <Link href="/settings" className="btn btn-outline btn-lg">Join with Code</Link>
       </div>
+    </motion.div>
+  );
+}
+
+// ─── Mini chart tooltip ───────────────────────────────────────────────────────
+
+function MiniTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white shadow-lg">
+      <span className="text-emerald-400 font-bold">{formatCurrency(payload[0]?.value ?? 0)}</span>
     </div>
   );
 }
 
-// ── Dashboard ──────────────────────────────────────────────────────────────────
+// ─── Greeting helper ──────────────────────────────────────────────────────────
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+// ─── Mock 7-day data ──────────────────────────────────────────────────────────
+
+const mock7Day = [
+  { day: 'Mon', cost: 120 },
+  { day: 'Tue', cost: 85  },
+  { day: 'Wed', cost: 200 },
+  { day: 'Thu', cost: 60  },
+  { day: 'Fri', cost: 140 },
+  { day: 'Sat', cost: 95  },
+  { day: 'Sun', cost: 170 },
+];
+
+// ─── Dashboard Page ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { selectedFamilyId: familyId } = useFamily();
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const greeting = getGreeting();
+  const dateLabel = format(new Date(), 'EEEE, MMMM d');
+
+  // ── Queries ──
 
   const { data: analytics, isLoading: aLoading } = useQuery({
     queryKey: ['analytics-dashboard', familyId],
@@ -224,132 +301,238 @@ export default function DashboardPage() {
     enabled: !!familyId,
   });
 
-  const { data: aiSuggestions, isLoading: sLoading } = useQuery({
+  const { data: aiSuggestionsRaw, isLoading: sLoading } = useQuery({
     queryKey: ['ai-suggestions', familyId],
     queryFn: () => aiApi.getSuggestions(familyId!).then((r) => r.data.data),
     enabled: !!familyId,
   });
 
-  const { data: fruitAlerts, isLoading: fLoading } = useQuery({
+  const { data: fruitAlertsRaw, isLoading: fLoading } = useQuery({
     queryKey: ['fruit-alerts', familyId],
     queryFn: () => fruitsApi.getAlerts(familyId!).then((r) => r.data.data),
     enabled: !!familyId,
   });
 
-  const { data: todayMeals, isLoading: mLoading } = useQuery({
-    queryKey: ['meals-today', familyId, today],
+  const { data: todayMealsRaw, isLoading: mLoading } = useQuery({
+    queryKey: ['meals-today', familyId, todayStr],
     queryFn: () =>
-      mealsApi.list({ familyId, startDate: today, endDate: today }).then((r) => {
+      mealsApi.list({ familyId, startDate: todayStr, endDate: todayStr }).then((r) => {
         const list = Array.isArray(r.data.data) ? r.data.data : [];
         return list.map((m: any) => ({ ...m, date: m.scheduledAt ?? m.date }));
       }),
     enabled: !!familyId,
   });
 
-  if (!familyId) return (
-    <>
-      <Header title="Dashboard" description="Your smart food & grocery overview" />
-      <NoFamilyPrompt />
-    </>
-  );
+  // ── No family ──
+
+  if (!familyId) {
+    return (
+      <>
+        <Header title="Dashboard" description="Your smart food & grocery overview" />
+        <NoFamilyState />
+      </>
+    );
+  }
+
+  // ── Derived data ──
 
   const raw = analytics ?? ({} as any);
   const stats = {
-    totalItems:   raw.inventory?.totalItems ?? 0,
-    totalValue:   raw.inventory?.totalValue ?? 0,
-    expiring:     raw.inventory?.expiringSoonCount ?? raw.inventory?.expiringSoon ?? 0,
-    wasteCost:    raw.waste?.wasteCostThisMonth ?? raw.waste?.monthlyWasteCost ?? 0,
+    totalItems: raw.inventory?.totalItems ?? 0,
+    totalValue: raw.inventory?.totalValue ?? 0,
+    expiring:   raw.inventory?.expiringSoonCount ?? raw.inventory?.expiringSoon ?? 0,
+    wasteCost:  raw.waste?.wasteCostThisMonth ?? raw.waste?.monthlyWasteCost ?? 0,
   };
 
-  const suggestions: any[] = Array.isArray(aiSuggestions) ? aiSuggestions : [];
-  const alerts: any[] = Array.isArray(fruitAlerts) ? fruitAlerts : [];
-  const meals: any[] = Array.isArray(todayMeals) ? todayMeals : [];
+  const suggestions: any[] = Array.isArray(aiSuggestionsRaw) ? aiSuggestionsRaw : [];
+  const alerts: any[]      = Array.isArray(fruitAlertsRaw)   ? fruitAlertsRaw   : [];
+  const meals: any[]       = Array.isArray(todayMealsRaw)    ? todayMealsRaw    : [];
+
+  const mealTypeConfig: Record<string, { bg: string; label: string }> = {
+    BREAKFAST: { bg: 'bg-yellow-100 text-yellow-700', label: 'Breakfast' },
+    LUNCH:     { bg: 'bg-blue-100 text-blue-700',     label: 'Lunch'     },
+    DINNER:    { bg: 'bg-purple-100 text-purple-700', label: 'Dinner'    },
+    SNACK:     { bg: 'bg-pink-100 text-pink-700',     label: 'Snack'     },
+  };
+
+  const alertSeverityConfig: Record<string, { card: string; iconBg: string; iconColor: string }> = {
+    HIGH:   { card: 'bg-red-50 border-red-200',    iconBg: 'bg-red-100',    iconColor: 'text-red-600'    },
+    MEDIUM: { card: 'bg-orange-50 border-orange-200', iconBg: 'bg-orange-100', iconColor: 'text-orange-600' },
+    LOW:    { card: 'bg-yellow-50 border-yellow-200', iconBg: 'bg-yellow-100', iconColor: 'text-yellow-600' },
+  };
+
+  // ── Render ──
 
   return (
     <>
-      <Header title="Dashboard" description={`Good ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}! Here's your overview.`} />
+      <Header
+        title="Dashboard"
+        description={`${greeting}! Here's your household overview.`}
+      />
 
-      <div className="p-6 space-y-7 max-w-7xl fade-in">
+      <motion.div
+        variants={pageVariants}
+        initial="hidden"
+        animate="show"
+        className="p-6 space-y-7 max-w-7xl"
+      >
+        {/* ── Greeting + Date ── */}
+        <motion.div variants={fadeUp} className="flex items-end justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">{greeting}!</h2>
+            <p className="text-sm text-gray-400 mt-0.5">{dateLabel}</p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100">
+            <Zap className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="text-xs font-semibold text-emerald-700">Smart kitchen overview</span>
+          </div>
+        </motion.div>
 
-        {/* ── Stats ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          {aLoading ? (
-            [0,1,2,3].map((i) => <SkeletonStatCard key={i} />)
-          ) : (
-            <>
-              <StatCard label="Inventory Items" value={stats.totalItems} sub="items in stock" icon={Package} accent="blue" />
-              <StatCard label="Inventory Value" value={formatCurrency(stats.totalValue)} sub="estimated worth" icon={IndianRupee} accent="emerald" trendUp trend="Current value" />
-              <StatCard label="Expiring Soon" value={stats.expiring} sub="within 3 days" icon={AlertTriangle} accent="orange" />
-              <StatCard label="Waste This Month" value={formatCurrency(stats.wasteCost)} sub="food cost wasted" icon={TrendingDown} accent="red" />
-            </>
-          )}
-        </div>
+        {/* ── Stat Cards ── */}
+        <AnimatePresence>
+          <motion.div
+            variants={pageVariants}
+            className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4"
+          >
+            {aLoading ? (
+              [0, 1, 2, 3].map((i) => <StatSkeleton key={i} />)
+            ) : (
+              <>
+                <StatCard
+                  label="Inventory Items"
+                  value={stats.totalItems}
+                  sub="items in stock"
+                  icon={Package}
+                  accent="blue"
+                  delay={0}
+                />
+                <StatCard
+                  label="Total Value"
+                  value={formatCurrency(stats.totalValue)}
+                  sub="estimated inventory worth"
+                  icon={IndianRupee}
+                  accent="emerald"
+                  delay={1}
+                />
+                <StatCard
+                  label="Expiring Soon"
+                  value={stats.expiring}
+                  sub="within the next 3 days"
+                  icon={AlertTriangle}
+                  accent="orange"
+                  pulseIcon={stats.expiring > 0}
+                  delay={2}
+                />
+                <StatCard
+                  label="Waste This Month"
+                  value={formatCurrency(stats.wasteCost)}
+                  sub="food cost wasted"
+                  icon={TrendingDown}
+                  accent="red"
+                  delay={3}
+                />
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-        {/* ── Main grid ── */}
+        {/* ── Main Grid ── */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-          {/* Left: AI + Fruit Alerts */}
+          {/* ── Left: AI + Fruit Alerts ── */}
           <div className="xl:col-span-2 space-y-6">
 
             {/* AI Suggestions */}
-            <Section title="AI Suggestions" icon={Sparkles} iconClass="bg-purple-100 text-purple-600" href="/ai-suggestions">
-              {sLoading ? (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {[0,1,2,3].map((i) => <SkeletonStatCard key={i} />)}
+            <Section title="AI Suggestions" icon={Sparkles} iconCls="bg-purple-100 text-purple-600" href="/ai-suggestions">
+              {!familyId ? (
+                <div className="card px-6 py-10 text-center">
+                  <Sparkles className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">Create a family to get AI recommendations</p>
                 </div>
+              ) : sLoading ? (
+                <CardSkeleton n={4} />
               ) : suggestions.length > 0 ? (
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {suggestions.slice(0, 4).map((s: any, i: number) => (
-                    <div key={s.id ?? i} className="card-hover p-4 group cursor-pointer">
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <p className="text-sm font-semibold text-gray-900 leading-snug flex-1">{s.title ?? s.type}</p>
-                        <PriorityDot priority={s.priority ?? 'LOW'} />
-                      </div>
-                      <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{s.description ?? s.message}</p>
-                      <div className="mt-3 flex items-center gap-1 text-[11px] text-emerald-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
-                        View details <ArrowUpRight className="w-3 h-3" />
-                      </div>
-                    </div>
-                  ))}
+                  {suggestions.slice(0, 4).map((s: any, i: number) => {
+                    const priority: string = s.priority ?? 'LOW';
+                    const borderColor =
+                      priority === 'HIGH'   ? 'border-l-red-500' :
+                      priority === 'MEDIUM' ? 'border-l-amber-500' :
+                                              'border-l-emerald-500';
+                    return (
+                      <motion.div
+                        key={s.id ?? i}
+                        variants={fadeUp}
+                        whileHover={{ y: -2, scale: 1.01, boxShadow: '0 8px 20px rgba(0,0,0,0.09)' }}
+                        className={cn('card-hover p-4 border-l-[3px] group', borderColor)}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <p className="text-sm font-semibold text-gray-900 leading-snug flex-1 line-clamp-2">
+                            {s.title ?? s.type ?? 'AI Tip'}
+                          </p>
+                          <PriorityBadge priority={priority} />
+                        </div>
+                        <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                          {s.description ?? s.message}
+                        </p>
+                        <div className="mt-3 flex items-center gap-1 text-[11px] text-emerald-600 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                          View details <ArrowUpRight className="w-3 h-3" />
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               ) : (
-                <Empty icon={Sparkles} message="No suggestions right now. Add inventory to get AI-powered recommendations." />
+                <Empty
+                  icon={Sparkles}
+                  message="No suggestions right now. Add inventory to get AI-powered recommendations."
+                />
               )}
             </Section>
 
             {/* Fruit Alerts */}
-            <Section title="Fruit Alerts" icon={Bell} iconClass="bg-orange-100 text-orange-600" href="/fruits">
+            <Section title="Fruit Alerts" icon={Bell} iconCls="bg-orange-100 text-orange-600" href="/fruits">
               {fLoading ? (
-                <SkeletonRows n={2} />
+                <RowSkeleton n={2} />
               ) : alerts.length > 0 ? (
-                <div className="space-y-2.5">
-                  {alerts.map((a: any, i: number) => (
-                    <div key={a.id ?? i} className={cn(
-                      'rounded-xl p-4 border flex items-start gap-3',
-                      a.severity === 'HIGH'   ? 'bg-red-50 border-red-200' :
-                      a.severity === 'MEDIUM' ? 'bg-orange-50 border-orange-200' :
-                                                'bg-yellow-50 border-yellow-200',
-                    )}>
-                      <div className={cn(
-                        'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-                        a.severity === 'HIGH' ? 'bg-red-100' : a.severity === 'MEDIUM' ? 'bg-orange-100' : 'bg-yellow-100',
-                      )}>
-                        <AlertTriangle className={cn(
-                          'w-4 h-4',
-                          a.severity === 'HIGH' ? 'text-red-600' : a.severity === 'MEDIUM' ? 'text-orange-600' : 'text-yellow-600',
-                        )} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{a.fruitName ?? a.title}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{a.message ?? a.description}</p>
+                <div className="flex gap-3 overflow-x-auto pb-1 -mx-0.5 px-0.5 scrollbar-hide">
+                  {alerts.map((a: any, i: number) => {
+                    const severity: string = a.severity ?? 'LOW';
+                    const cfg = alertSeverityConfig[severity] ?? alertSeverityConfig.LOW;
+                    return (
+                      <motion.div
+                        key={a.id ?? i}
+                        variants={fadeUp}
+                        className={cn(
+                          'rounded-xl p-4 border flex-shrink-0 w-52 flex flex-col gap-2',
+                          cfg.card,
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', cfg.iconBg)}>
+                            <AlertTriangle className={cn('w-4 h-4', cfg.iconColor)} />
+                          </div>
+                          <p className="text-sm font-bold text-gray-900 truncate">
+                            {a.fruitName ?? a.title}
+                          </p>
+                        </div>
+                        <p className="text-xs text-gray-600 leading-snug line-clamp-2">
+                          {a.message ?? a.description}
+                        </p>
                         {a.ripenessLevel && (
-                          <span className="inline-block mt-1.5 text-[11px] font-medium px-2 py-0.5 bg-white/80 rounded-full border text-gray-600">
+                          <span className="inline-block text-[10px] font-semibold px-2 py-0.5 bg-white/80 rounded-full border border-white text-gray-600 self-start">
                             {a.ripenessLevel}
                           </span>
                         )}
-                      </div>
-                    </div>
-                  ))}
+                        <span className={cn(
+                          'badge self-start',
+                          severity === 'HIGH' ? 'badge-red' : severity === 'MEDIUM' ? 'badge-orange' : 'badge-amber',
+                        )}>
+                          {severity}
+                        </span>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               ) : (
                 <Empty icon={Bell} message="All fruits are in good condition. No alerts!" />
@@ -357,86 +540,118 @@ export default function DashboardPage() {
             </Section>
           </div>
 
-          {/* Right: Today's Meals + Quick Actions */}
+          {/* ── Right: Meals + Quick Actions + Mini Chart ── */}
           <div className="space-y-6">
 
             {/* Today's Meals */}
-            <Section title="Today's Meals" icon={Utensils} iconClass="bg-emerald-100 text-emerald-600" href="/meal-planner" hrefLabel="Plan">
+            <Section title="Today's Meals" icon={Utensils} iconCls="bg-emerald-100 text-emerald-600" href="/meal-planner" hrefLabel="Plan">
               {mLoading ? (
-                <SkeletonRows n={3} />
+                <RowSkeleton n={3} />
               ) : meals.length > 0 ? (
                 <div className="space-y-2.5">
                   {meals.map((meal: any) => {
-                    const mealTypeColors: Record<string, string> = {
-                      BREAKFAST: 'bg-yellow-100 text-yellow-700',
-                      LUNCH:     'bg-blue-100 text-blue-700',
-                      DINNER:    'bg-purple-100 text-purple-700',
-                      SNACK:     'bg-pink-100 text-pink-700',
-                    };
-                    const typeColor = mealTypeColors[meal.mealType] ?? 'bg-gray-100 text-gray-600';
-
+                    const mt = mealTypeConfig[meal.mealType] ?? { bg: 'bg-gray-100 text-gray-600', label: meal.mealType };
                     return (
-                      <div key={meal.id} className="card-hover p-4">
+                      <motion.div key={meal.id} variants={fadeUp} className="card-hover p-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-gray-900 truncate">
                               {meal.recipe?.name ?? meal.customMealName ?? 'Unnamed Meal'}
                             </p>
                             <div className="flex items-center gap-2 mt-1.5">
-                              <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full', typeColor)}>
-                                {meal.mealType?.toLowerCase()}
+                              <span className={cn('text-[11px] font-semibold px-2 py-0.5 rounded-full', mt.bg)}>
+                                {mt.label}
                               </span>
-                              <span className="text-[11px] text-gray-400">{meal.servings} servings</span>
+                              {meal.servings && (
+                                <span className="text-[11px] text-gray-400">{meal.servings} servings</span>
+                              )}
                             </div>
                           </div>
-                          <MealBadge status={meal.status ?? 'PLANNED'} />
+                          <span className={cn(
+                            'badge shrink-0',
+                            meal.status === 'COMPLETED' ? 'badge-green' :
+                            meal.status === 'SKIPPED'   ? 'badge-gray'  :
+                            meal.status === 'PLANNED'   ? 'badge-blue'  :
+                                                          'badge-amber',
+                          )}>
+                            {meal.status ?? 'PLANNED'}
+                          </span>
                         </div>
-                      </div>
+                      </motion.div>
                     );
                   })}
                 </div>
               ) : (
-                <Empty icon={Utensils} message="No meals planned today." cta="Add meals" ctaHref="/meal-planner" />
+                <Empty icon={Utensils} message="No meals planned for today." cta="Plan meals" ctaHref="/meal-planner" />
               )}
             </Section>
 
             {/* Quick Actions */}
-            <section>
+            <motion.section variants={fadeUp}>
               <h2 className="section-title mb-3.5">Quick Actions</h2>
               <div className="grid grid-cols-2 gap-3">
-                <QuickAction href="/inventory"    label="Add Grocery"     icon={Plus}         gradient="bg-gradient-to-br from-emerald-500 to-teal-600" />
-                <QuickAction href="/meal-planner" label="Plan Meals"      icon={Calendar}     gradient="bg-gradient-to-br from-blue-500 to-blue-600" />
-                <QuickAction href="/shopping"     label="Shopping List"   icon={ShoppingCart} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
-                <QuickAction href="/waste"        label="Log Waste"       icon={Trash2}       gradient="bg-gradient-to-br from-red-500 to-rose-600" />
+                <QuickAction href="/inventory"    label="Add Grocery"   icon={Plus}         gradient="bg-gradient-to-br from-emerald-500 to-teal-600" />
+                <QuickAction href="/meal-planner" label="Plan Meals"    icon={Calendar}     gradient="bg-gradient-to-br from-blue-500 to-blue-600" />
+                <QuickAction href="/shopping"     label="Shopping List" icon={ShoppingCart} gradient="bg-gradient-to-br from-violet-500 to-purple-600" />
+                <QuickAction href="/waste"        label="Log Waste"     icon={Trash2}       gradient="bg-gradient-to-br from-red-500 to-rose-600" />
               </div>
-            </section>
+            </motion.section>
 
-            {/* Mini chart placeholder / stats strip */}
-            <section>
-              <Link href="/analytics" className="block card-hover p-4 bg-gradient-to-br from-slate-800 to-slate-900">
-                <div className="flex items-center justify-between mb-3">
+            {/* Mini Chart — 7-day overview */}
+            <motion.section variants={fadeUp}>
+              <div className="card bg-gradient-to-br from-slate-800 to-slate-900 border-slate-700/50 p-5">
+                <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">Analytics</p>
-                    <p className="text-sm font-bold text-white mt-0.5">View full report</p>
+                    <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Waste Trend</p>
+                    <p className="text-sm font-bold text-white mt-0.5">7-day overview</p>
                   </div>
-                  <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
-                    <ChevronRight className="w-4 h-4 text-white" />
-                  </div>
+                  <Link
+                    href="/waste"
+                    className="flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold transition-colors"
+                  >
+                    View analytics <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
-                <div className="flex items-end gap-1 h-10">
-                  {[4, 7, 5, 8, 6, 9, 7, 10, 8, 6, 9, 11].map((h, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 rounded-sm bg-emerald-500/60 transition-all"
-                      style={{ height: `${(h / 11) * 100}%` }}
-                    />
-                  ))}
+                <div style={{ height: 110 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={mock7Day} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="miniGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%"   stopColor="#10b981" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity={0}   />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <XAxis
+                        dataKey="day"
+                        tick={{ fontSize: 9, fill: '#64748b' }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 9, fill: '#64748b' }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v) => `₹${v}`}
+                      />
+                      <Tooltip content={<MiniTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="cost"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        fill="url(#miniGrad)"
+                        dot={false}
+                        activeDot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-              </Link>
-            </section>
+              </div>
+            </motion.section>
           </div>
         </div>
-      </div>
+      </motion.div>
     </>
   );
 }

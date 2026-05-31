@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { useAuth } from '@/hooks/useAuth';
+import { AIAssistant } from '@/components/ui/AIAssistant';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, fetchMe, accessToken } = useAuth();
@@ -25,6 +26,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-y-auto min-w-0">
         {children}
       </main>
+      <AIAssistant />
     </div>
   );
 }
